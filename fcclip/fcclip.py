@@ -173,6 +173,9 @@ class FCCLIP(nn.Module):
             num_templates.append(templated_classes_num) # how many templates for current classes
         class_names = templated_class_names
         #print("text for classification:", class_names)
+        # category_overlapping_mask (N_train, )
+        # num_templates, [num_per_class_name, ], num of cur class is splited to how many components
+        # class_names, [per_class_template, ], per_class_template [N_comp * N_template]
         return category_overlapping_mask, num_templates, class_names
 
     def set_metadata(self, metadata):
@@ -190,12 +193,15 @@ class FCCLIP(nn.Module):
                 for idx in range(0, len(self.train_class_names), bs):
                     text_classifier.append(self.backbone.get_text_classifier(self.train_class_names[idx:idx+bs], self.device).detach())
                 text_classifier = torch.cat(text_classifier, dim=0)
+                # get per text embedding for per class template
 
                 # average across templates and normalization.
                 text_classifier /= text_classifier.norm(dim=-1, keepdim=True)
                 text_classifier = text_classifier.reshape(text_classifier.shape[0]//len(VILD_PROMPT), len(VILD_PROMPT), text_classifier.shape[-1]).mean(1)
                 text_classifier /= text_classifier.norm(dim=-1, keepdim=True)
                 self.train_text_classifier = text_classifier
+            # self.train_text_classifier, per component templates
+            # self.train_num_templates, per class have how many components
             return self.train_text_classifier, self.train_num_templates
         else:
             if self.test_text_classifier is None:
